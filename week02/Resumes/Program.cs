@@ -4,6 +4,11 @@ class Program
 {
     static void Main(string[] args)
     {
-        Console.WriteLine("Hello World! This is the Resumes Project.");
+        Person person = new Person();
+        person._givenName = "Raphael";
+        person._familyName = "Daveal";
+
+        person.ShowEasternName();
+        person.ShowWesternName();
     }
 }
