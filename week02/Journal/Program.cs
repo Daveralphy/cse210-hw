@@ -1,3 +1,7 @@
+// To exceed the requirements for this assignment, I implemented a DeleteEntry() method that allows removing multiple entries at once using index input.
+// I also used a custom delimiter for saving and loading entries to avoid split errors with commas or text content.
+// Lastly, I added better user experience elements like formatted dates, validation checks, and clear menu prompts.
+
 using System;
 
 class Program
