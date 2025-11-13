@@ -28,6 +28,14 @@ public class Scripture
         }
     }
 
+    public void RevealAllWords()
+    {
+        foreach (var w in _words)
+        {
+            w.Reveal();
+        }
+    }
+
     public string GetDisplayText()
     {
         string wordsText = string.Join(" ", _words.Select(w => w.GetDisplayText()));

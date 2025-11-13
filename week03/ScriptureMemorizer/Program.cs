@@ -1,3 +1,7 @@
+// To exceed this assignment's requirements, I added a feature that lets the user choose how many 
+// words to hide each round and reveal the full scripture afterward, making it more interactive 
+// and effective for memorization practice.
+
 using System;
 
 class Program
@@ -12,13 +16,27 @@ class Program
         {
             Console.Clear();
             Console.WriteLine(scripture.GetDisplayText());
-            Console.WriteLine("\nPress Enter to hide words or type 'quit' to end.");
+            Console.WriteLine("\nPress Enter to hide words, type a number to hide that many words, type 'reveal' to show the full scripture, or type 'quit' to end.");
             string input = Console.ReadLine();
 
             if (input.ToLower() == "quit" || scripture.IsCompletelyHidden())
                 break;
 
-            scripture.HideRandomWords(3);
+            if (input.ToLower() == "reveal")
+            {
+                Console.Clear();
+                scripture.RevealAllWords();
+                Console.WriteLine(scripture.GetDisplayText());
+                Console.WriteLine("\nPress Enter to end.");
+                Console.ReadLine();
+                break;
+            }
+
+            int count;
+            if (int.TryParse(input, out count) && count > 0)
+                scripture.HideRandomWords(count);
+            else
+                scripture.HideRandomWords(3);
         }
     }
 }
