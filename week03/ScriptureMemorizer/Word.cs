@@ -16,6 +16,11 @@ public class Word
         _isHidden = true;
     }
 
+    public void Reveal()
+    {
+        _isHidden = false;
+    }
+
     public bool IsHidden()
     {
         return _isHidden;
