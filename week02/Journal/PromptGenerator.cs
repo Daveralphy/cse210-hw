@@ -19,3 +19,4 @@ class PromptGenerator
         return _prompts[index];
     }
 }
+
