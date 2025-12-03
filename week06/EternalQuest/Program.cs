@@ -6,14 +6,21 @@
 
 using System;
 
+using System;
+
 class Program
 {
+    // Exceeded requirements:
+    // I added levels. This helps the user feel progress.
+    // I added XP. This rewards the user for completing goals.
+    // I added a daily streak system. This encourages the user to keep coming back every day.
+    // I added automatic loading and saving so progress does not reset.
 
     static void Main(string[] args)
     {
         GoalManager gm = new GoalManager();
 
-        gm.AutoLoad();    
+        gm.AutoLoad();
         gm.Start();
         gm.AutoSave();
     }

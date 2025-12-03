@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Collections.Generic;
 
 public class GoalManager
@@ -11,6 +12,92 @@ public class GoalManager
     private int _xp = 0;
     private int _streak = 0;
     private DateTime _lastRecordDate = DateTime.MinValue;
+
+    public void AutoLoad()
+    {
+        string file = "autosave.csv";
+
+        if (!File.Exists(file))
+            return;
+
+        var lines = File.ReadAllLines(file);
+        bool headerFound = lines[0].StartsWith("type,name");
+        int start = headerFound ? 1 : 0;
+
+        _goals.Clear();
+
+        for (int i = start; i < lines.Length; i++)
+        {
+            var row = lines[i].Split(',');
+
+            string type = row[0];
+            string name = row[1];
+            string desc = row[2];
+            int points = int.Parse(row[3]);
+
+            string date = row[4];
+            if (!string.IsNullOrWhiteSpace(date))
+                DateTime.TryParse(date, out _lastRecordDate);
+
+            if (type == "SimpleGoal")
+            {
+                bool complete = bool.Parse(row[5]);
+                var g = new SimpleGoal(name, desc, points);
+                if (complete) g.RecordEvent();
+                _goals.Add(g);
+            }
+            else if (type == "EternalGoal")
+            {
+                _goals.Add(new EternalGoal(name, desc, points));
+            }
+            else if (type == "ChecklistGoal")
+            {
+                int completed = int.Parse(row[6]);
+                int target = int.Parse(row[7]);
+                int bonus = int.Parse(row[8]);
+
+                var g = new ChecklistGoal(name, desc, points, target, bonus);
+                for (int c = 0; c < completed; c++)
+                    g.RecordEvent();
+
+                _goals.Add(g);
+            }
+        }
+    }
+
+    public void AutoSave()
+    {
+        string file = "autosave.csv";
+
+        List<string> lines = new List<string>();
+        lines.Add("type,name,description,points,date,complete,amountCompleted,target,bonus");
+
+        string dateString = _lastRecordDate == DateTime.MinValue
+            ? ""
+            : _lastRecordDate.ToString("yyyy-MM-dd");
+
+        foreach (Goal g in _goals)
+        {
+            if (g is SimpleGoal sg)
+            {
+                lines.Add($"SimpleGoal,{sg.GetName()},{sg.GetDescription()},{sg.GetPoints()},{dateString},{sg.IsComplete()},,,");
+            }
+            else if (g is EternalGoal eg)
+            {
+                lines.Add($"EternalGoal,{eg.GetName()},{eg.GetDescription()},{eg.GetPoints()},{dateString},,,,");
+            }
+            else if (g is ChecklistGoal cg)
+            {
+                var rep = cg.GetStringRepresentation().Split("|");
+                int completed = int.Parse(rep[4]);
+                int target = int.Parse(rep[5]);
+                int bonus = int.Parse(rep[6]);
+                lines.Add($"ChecklistGoal,{cg.GetName()},{cg.GetDescription()},{cg.GetPoints()},{dateString},,{completed},{target},{bonus}");
+            }
+        }
+
+        File.WriteAllLines(file, lines);
+    }
 
     public void Start()
     {
@@ -39,86 +126,6 @@ public class GoalManager
                 case "6": return;
             }
         }
-    }
-
-    public void AutoLoad()
-    {
-        string file = "autosave.txt";
-
-        if (!File.Exists(file))
-            return;
-
-        string[] lines = File.ReadAllLines(file);
-        _goals.Clear();
-
-        if (lines.Length < 5)
-            return;
-
-        _score = int.Parse(lines[0]);
-        _level = int.Parse(lines[1]);
-        _xp = int.Parse(lines[2]);
-        _streak = int.Parse(lines[3]);
-
-        if (string.IsNullOrWhiteSpace(lines[4]))
-        {
-            _lastRecordDate = DateTime.MinValue;
-        }
-        else
-        {
-            DateTime.TryParse(lines[4], null, System.Globalization.DateTimeStyles.RoundtripKind, out _lastRecordDate);
-        }
-
-        for (int i = 5; i < lines.Length; i++)
-        {
-            string[] p = lines[i].Split("|");
-            string type = p[0];
-
-            if (type == "SimpleGoal")
-            {
-                var g = new SimpleGoal(p[1], p[2], int.Parse(p[3]));
-                if (bool.Parse(p[4]))
-                    g.RecordEvent();
-                _goals.Add(g);
-            }
-            else if (type == "EternalGoal")
-            {
-                _goals.Add(new EternalGoal(p[1], p[2], int.Parse(p[3])));
-            }
-            else if (type == "ChecklistGoal")
-            {
-                var g = new ChecklistGoal(
-                    p[1], p[2], int.Parse(p[3]),
-                    int.Parse(p[5]), int.Parse(p[6])
-                );
-
-                int completed = int.Parse(p[4]);
-                for (int c = 0; c < completed; c++)
-                    g.RecordEvent();
-
-                _goals.Add(g);
-            }
-        }
-    }
-
-    public void AutoSave()
-    {
-        string file = "autosave.txt";
-
-        List<string> lines = new List<string>();
-        lines.Add(_score.ToString());
-        lines.Add(_level.ToString());
-        lines.Add(_xp.ToString());
-        lines.Add(_streak.ToString());
-
-        if (_lastRecordDate == DateTime.MinValue)
-            lines.Add("");
-        else
-            lines.Add(_lastRecordDate.ToString("o"));
-
-        foreach (Goal g in _goals)
-            lines.Add(g.GetStringRepresentation());
-
-        File.WriteAllLines(file, lines);
     }
 
     private void CreateGoal()
@@ -173,17 +180,13 @@ public class GoalManager
         Console.Write("Goal number: ");
 
         int i = int.Parse(Console.ReadLine()) - 1;
-
         if (i < 0 || i >= _goals.Count)
-        {
             return;
-        }
 
         int points = _goals[i].RecordEvent();
         _score += points;
 
         _xp += points;
-
         while (_xp >= 1000)
         {
             _level++;
@@ -214,83 +217,118 @@ public class GoalManager
         Console.Write("File name? ");
         string file = Console.ReadLine();
 
-        List<string> lines = new List<string>();
-        lines.Add(_score.ToString());
-        lines.Add(_level.ToString());
-        lines.Add(_xp.ToString());
-        lines.Add(_streak.ToString());
+        bool exists = File.Exists(file);
 
-        if (_lastRecordDate == DateTime.MinValue)
-            lines.Add("");
+        if (exists)
+        {
+            Console.WriteLine("This file already exists.");
+            Console.Write("Save to this file? (yes/no): ");
+            string choice = Console.ReadLine().ToLower();
+            if (choice != "yes")
+                return;
+        }
+
+        List<string> lines = new List<string>();
+
+        if (!exists)
+        {
+            lines.Add("type,name,description,points,date,complete,amountCompleted,target,bonus");
+        }
         else
-            lines.Add(_lastRecordDate.ToString("o"));
+        {
+            string firstLine = File.ReadLines(file).First();
+            if (!firstLine.StartsWith("type,name"))
+            {
+                lines.Add("type,name,description,points,date,complete,amountCompleted,target,bonus");
+            }
+            else
+            {
+                lines.Add(firstLine);
+                lines.AddRange(File.ReadAllLines(file).Skip(1));
+            }
+        }
+
+        string dateString = _lastRecordDate == DateTime.MinValue
+            ? ""
+            : _lastRecordDate.ToString("yyyy-MM-dd");
 
         foreach (Goal g in _goals)
-            lines.Add(g.GetStringRepresentation());
+        {
+            if (g is SimpleGoal sg)
+            {
+                lines.Add($"SimpleGoal,{sg.GetName()},{sg.GetDescription()},{sg.GetPoints()},{dateString},{sg.IsComplete()},,,");
+            }
+            else if (g is EternalGoal eg)
+            {
+                lines.Add($"EternalGoal,{eg.GetName()},{eg.GetDescription()},{eg.GetPoints()},{dateString},,,,");
+            }
+            else if (g is ChecklistGoal cg)
+            {
+                var rep = cg.GetStringRepresentation().Split("|");
+                int completed = int.Parse(rep[4]);
+                int target = int.Parse(rep[5]);
+                int bonus = int.Parse(rep[6]);
+                lines.Add($"ChecklistGoal,{cg.GetName()},{cg.GetDescription()},{cg.GetPoints()},{dateString},,{completed},{target},{bonus}");
+            }
+        }
 
         File.WriteAllLines(file, lines);
+        Console.WriteLine("Goals saved to CSV successfully.");
     }
 
     private void LoadGoals()
     {
         while (true)
         {
-            Console.Write("Enter file name to load (or type 'back' to return to menu): ");
+            Console.Write("Enter CSV file name to load (or type 'back'): ");
             string file = Console.ReadLine();
 
             if (file.ToLower() == "back")
-            {
                 return;
-            }
 
             if (!File.Exists(file))
             {
-                Console.WriteLine("File not found. Try again or type 'back' to return.");
-                Console.WriteLine();
+                Console.WriteLine("File not found. Try again.");
                 continue;
             }
 
-            string[] lines = File.ReadAllLines(file);
+            var lines = File.ReadAllLines(file);
+            bool headerFound = lines[0].StartsWith("type,name");
+            int start = headerFound ? 1 : 0;
+
             _goals.Clear();
 
-            _score = int.Parse(lines[0]);
-            _level = int.Parse(lines[1]);
-            _xp = int.Parse(lines[2]);
-            _streak = int.Parse(lines[3]);
+            for (int i = start; i < lines.Length; i++)
+            {
+                var row = lines[i].Split(',');
 
-            if (string.IsNullOrWhiteSpace(lines[4]))
-            {
-                _lastRecordDate = DateTime.MinValue;
-            }
-            else
-            {
-                DateTime.TryParse(lines[4], null, System.Globalization.DateTimeStyles.RoundtripKind, out _lastRecordDate);
-            }
+                string type = row[0];
+                string name = row[1];
+                string desc = row[2];
+                int points = int.Parse(row[3]);
 
-            for (int i = 5; i < lines.Length; i++)
-            {
-                string[] p = lines[i].Split("|");
-                string type = p[0];
+                string date = row[4];
+                if (!string.IsNullOrWhiteSpace(date))
+                    DateTime.TryParse(date, out _lastRecordDate);
 
                 if (type == "SimpleGoal")
                 {
-                    var g = new SimpleGoal(p[1], p[2], int.Parse(p[3]));
-                    if (bool.Parse(p[4]))
-                        g.RecordEvent();
+                    bool complete = bool.Parse(row[5]);
+                    var g = new SimpleGoal(name, desc, points);
+                    if (complete) g.RecordEvent();
                     _goals.Add(g);
                 }
                 else if (type == "EternalGoal")
                 {
-                    _goals.Add(new EternalGoal(p[1], p[2], int.Parse(p[3])));
+                    _goals.Add(new EternalGoal(name, desc, points));
                 }
                 else if (type == "ChecklistGoal")
                 {
-                    var g = new ChecklistGoal(
-                        p[1], p[2], int.Parse(p[3]),
-                        int.Parse(p[5]), int.Parse(p[6])
-                    );
+                    int completed = int.Parse(row[6]);
+                    int target = int.Parse(row[7]);
+                    int bonus = int.Parse(row[8]);
 
-                    int completed = int.Parse(p[4]);
+                    var g = new ChecklistGoal(name, desc, points, target, bonus);
                     for (int c = 0; c < completed; c++)
                         g.RecordEvent();
 
@@ -298,7 +336,7 @@ public class GoalManager
                 }
             }
 
-            Console.WriteLine("Goals loaded successfully.");
+            Console.WriteLine("CSV goals loaded successfully.");
             return;
         }
     }
